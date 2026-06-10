@@ -19,6 +19,7 @@
 13. [Multiple Returns](#13-multiple-returns)
 14. [Defer](#14-defer)
 15. [Panic and Recover](#15-panic-and-recover)
+16. [Go routines]
 
 ---
 
@@ -815,6 +816,494 @@ return err
 instead.
 
 ---
+
+# Goroutines
+
+## What is a Goroutine?
+
+A Goroutine is a lightweight thread managed by the Go Runtime.
+
+In simple words:
+
+A Goroutine allows a function to run independently and concurrently with other functions.
+
+Normal Function:
+
+```go
+sendEmail()
+```
+
+Goroutine:
+
+```go
+go sendEmail()
+```
+
+The keyword:
+
+```go
+go
+```
+
+creates a new Goroutine.
+
+---
+
+## Why Were Goroutines Created?
+
+Before Go, concurrency was usually handled using Operating System Threads.
+
+Problem with Threads:
+
+- Heavyweight
+- Expensive to create
+- Consume more memory
+- Difficult to manage at scale
+
+Example:
+
+```text
+10000 Threads
+```
+
+would consume a huge amount of memory.
+
+Go introduced:
+
+```text
+Goroutines
+```
+
+which are:
+
+- Lightweight
+- Fast to create
+- Managed by Go Runtime
+- Scalable
+
+---
+
+## Real World Example
+
+Suppose a user places an order.
+
+Tasks:
+
+1. Save Order
+2. Send Email
+3. Send SMS
+4. Update Inventory
+
+Without Goroutines:
+
+```text
+Save Order
+    ↓
+Send Email
+    ↓
+Send SMS
+    ↓
+Update Inventory
+```
+
+Total Time:
+
+```text
+1 + 2 + 1 + 1 = 5 Seconds
+```
+
+---
+
+With Goroutines:
+
+```text
+Save Order
+      |
+      +---- Send Email
+      |
+      +---- Send SMS
+      |
+      +---- Update Inventory
+```
+
+Total Time:
+
+```text
+≈ 2 Seconds
+```
+
+because tasks run concurrently.
+
+---
+
+## First Goroutine Example
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func hello() {
+    fmt.Println("Hello from Goroutine")
+}
+
+func main() {
+
+    go hello()
+
+    time.Sleep(time.Second)
+}
+```
+
+Output:
+
+```text
+Hello from Goroutine
+```
+
+---
+
+## Why Is Sleep Used Here?
+
+Without:
+
+```go
+time.Sleep()
+```
+
+main function may finish before the Goroutine executes.
+
+Example:
+
+```go
+func main() {
+
+    go hello()
+}
+```
+
+Possible Output:
+
+```text
+Nothing
+```
+
+because:
+
+```text
+Main Function Finished
+      ↓
+Program Exits
+      ↓
+Goroutine Dies
+```
+
+---
+
+## Go Scheduler
+
+Question:
+
+Who manages Goroutines?
+
+Answer:
+
+Go Runtime Scheduler.
+
+Not the Operating System directly.
+
+Architecture:
+
+```text
+Application
+      |
+Goroutines (G)
+      |
+Scheduler
+      |
+OS Threads (M)
+      |
+CPU
+```
+
+The scheduler decides:
+
+- Which Goroutine runs
+- When it runs
+- On which OS thread it runs
+
+---
+
+## Goroutine vs Thread
+
+| Feature | Goroutine | Thread |
+|----------|----------|----------|
+| Managed By | Go Runtime | Operating System |
+| Memory | ~2 KB | ~1 MB |
+| Creation Cost | Very Low | High |
+| Switching Cost | Low | High |
+| Count | Millions | Thousands |
+
+---
+
+## Multiple Goroutines
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func worker(id int) {
+    fmt.Println("Worker", id)
+}
+
+func main() {
+
+    for i := 1; i <= 5; i++ {
+        go worker(i)
+    }
+
+    time.Sleep(time.Second)
+}
+```
+
+Output:
+
+```text
+Worker 3
+Worker 1
+Worker 5
+Worker 2
+Worker 4
+```
+
+Notice:
+
+Order changes every run.
+
+Reason:
+
+Concurrent execution.
+
+---
+
+## Anonymous Goroutine
+
+You can create Goroutines without a separate function.
+
+```go
+go func() {
+    fmt.Println("Running")
+}()
+```
+
+Very common.
+
+---
+
+## Common Use Cases
+
+### Sending Emails
+
+```go
+go sendEmail(user)
+```
+
+---
+
+### Sending Notifications
+
+```go
+go sendNotification(user)
+```
+
+---
+
+### Background Logging
+
+```go
+go saveLogs()
+```
+
+---
+
+### Payment Processing
+
+```go
+go processPayment()
+```
+
+---
+
+### Generating Reports
+
+```go
+go generateReport()
+```
+
+---
+
+## Problem: Shared Data
+
+Consider:
+
+```go
+counter++
+```
+
+from multiple Goroutines.
+
+Two Goroutines may:
+
+```text
+Read 5
+Read 5
+
+Write 6
+Write 6
+```
+
+Expected:
+
+```text
+7
+```
+
+Actual:
+
+```text
+6
+```
+
+This is called:
+
+```text
+Race Condition
+```
+
+---
+
+## Solution: Mutex
+
+```go
+var mu sync.Mutex
+
+mu.Lock()
+
+counter++
+
+mu.Unlock()
+```
+
+Only one Goroutine can access the shared variable at a time.
+
+---
+
+## Communication Between Goroutines
+
+Go follows:
+
+```text
+Don't communicate by sharing memory.
+Share memory by communicating.
+```
+
+Instead of sharing variables directly:
+
+Use Channels.
+
+---
+
+## Channel Example
+
+```go
+package main
+
+import "fmt"
+
+func worker(ch chan string) {
+
+    ch <- "Task Completed"
+}
+
+func main() {
+
+    ch := make(chan string)
+
+    go worker(ch)
+
+    result := <-ch
+
+    fmt.Println(result)
+}
+```
+
+Output:
+
+```text
+Task Completed
+```
+
+---
+
+## WaitGroup
+
+Used to wait for all Goroutines.
+
+```go
+var wg sync.WaitGroup
+
+wg.Add(1)
+
+go func() {
+
+    defer wg.Done()
+
+    fmt.Println("Working")
+
+}()
+
+wg.Wait()
+```
+
+Without WaitGroup:
+
+```text
+Main function may exit early.
+```
+
+---
+
+## Why Goroutines Are One of Go's Biggest Features
+
+Because they make concurrent programming:
+
+- Easier
+- Safer
+- Faster
+- More scalable
+
+This is one reason companies use Go for:
+
+- Microservices
+- APIs
+- Payment Systems
+- Distributed Systems
+- Cloud Platforms
+- High Traffic Applications
+
+Examples:
+
+- Kubernetes
+- Docker
+- Terraform
+- Prometheus
 
 
 These concepts form the foundation required before learning slices, maps, structs, interfaces, concurrency and backend development.
